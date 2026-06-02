@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulimi 3D i ADN & Mutacionit Gjenetik</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #020812;
+    --surface: #060f1e;
+    --panel: #0a1628;
+    --accent1: #00f5ff;
+    --accent2: #ff2d6e;
+    --accent3: #7fff00;
+    --accent4: #ff9500;
+    --text: #c8e6ff;
+    --muted: #4a6a8a;
+    --glow1: 0 0 20px #00f5ff88;
+    --glow2: 0 0 20px #ff2d6e88;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 30px 20px 15px;
+    border-bottom: 1px solid #0a2a4a;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.2rem, 3.5vw, 2.2rem);
+    font-weight: 900;
+    color: var(--accent1);
+    text-shadow: var(--glow1);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  header p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 2px;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    padding: 12px;
+    position: relative; z-index: 1;
+    min-height: calc(100vh - 100px);
+  }
+
+  @media (max-width: 1100px) {
+    .main-layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid #0d2040;
+    border-radius: 4px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent1), transparent);
+    opacity: 0.6;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #0d2040;
+  }
+
+  /* ===== CANVAS ===== */
+  #simCanvas {
+    width: 100%;
+    height: 100%;
+    min-height: 480px;
+    display: block;
+    border-radius: 2px;
+  }
+
+  .canvas-panel {
+    padding: 8px;
+    position: relative;
+    grid-row: span 2;
+  }
+
+  /* ===== CONTROLS ===== */
+  .control-group { margin-bottom: 18px; }
+
+  .control-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btn-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+  .btn {
+    background: #0a1a30;
+    border: 1px solid #0d3060;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 8px 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+
+  .btn:hover { background: #0d2548; border-color: var(--accent1); color: var(--accent1); }
+  .btn.active { background: #001830; border-color: var(--accent1); color: var(--accent1); box-shadow: var(--glow1); }
+  .btn.danger { border-color: #3a0a20; }
+  .btn.danger:hover, .btn.danger.active { background: #200010; border-color: var(--accent2); color: var(--accent2); box-shadow: var(--glow2); }
+  .btn.warn:hover, .btn.warn.active { background: #201400; border-color: var(--accent4); color: var(--accent4); }
+  .btn.safe:hover, .btn.safe.active { background: #102000; border-color: var(--accent3); color: var(--accent3); }
+
+  .slider-wrap { position: relative; }
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #0d2040;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent1);
+    box-shadow: 0 0 8px var(--accent1);
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent1);
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  /* ===== INFO DISPLAY ===== */
+  .info-box {
+    background: #060e1c;
+    border: 1px solid #0a2040;
+    border-left: 3px solid var(--accent1);
+    border-radius: 2px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    transition: all 0.4s;
+  }
+  .info-box.danger { border-left-color: var(--accent2); }
+  .info-box.warn { border-left-color: var(--accent4); }
+  .info-box.safe { border-left-color: var(--accent3); }
+
+  .info-box-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .info-box-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .disease-card {
+    background: linear-gradient(135deg, #0a0010, #130020);
+    border: 1px solid #2a0040;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 6px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .disease-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    color: var(--accent2);
+    text-shadow: var(--glow2);
+    margin-bottom: 6px;
+  }
+
+  .disease-desc {
+    font-size: 0.82rem;
+    color: #9ab0cc;
+    line-height: 1.6;
+    margin-bottom: 6px;
+  }
+
+  .disease-meta {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
+  .badge-danger { background: #2a0010; border: 1px solid var(--accent2); color: var(--accent2); }
+  .badge-warn { background: #1a1000; border: 1px solid var(--accent4); color: var(--accent4); }
+  .badge-safe { background: #001500; border: 1px solid var(--accent3); color: var(--accent3); }
+  .badge-info { background: #001520; border: 1px solid var(--accent1); color: var(--accent1); }
+
+  /* ===== LOG ===== */
+  .log-area {
+    height: 120px;
+    overflow-y: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    line-height: 1.8;
+    color: var(--muted);
+    background: #030810;
+    border: 1px solid #0a1a30;
+    border-radius: 2px;
+    padding: 8px;
+  }
+
+  .log-area .log-entry { color: var(--muted); }
+  .log-area .log-warn { color: var(--accent4); }
+  .log-area .log-danger { color: var(--accent2); }
+  .log-area .log-info { color: var(--accent1); }
+
+  /* ===== KARYOTYPE STRIP ===== */
+  .karyotype-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 8px;
+    background: #030810;
+    border: 1px solid #0a1a30;
+    border-radius: 2px;
+    min-height: 50px;
+    align-items: center;
+  }
+
+  .chrom {
+    width: 14px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, var(--accent1), #0040a0);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    transition: all 0.4s;
+    cursor: pointer;
+  }
+  .chrom:hover { transform: scale(1.3); }
+  .chrom.deleted { opacity: 0.1; background: #111; }
+  .chrom.extra { background: linear-gradient(180deg, var(--accent2), #800020); box-shadow: 0 0 6px var(--accent2); }
+  .chrom.mutated { background: linear-gradient(180deg, var(--accent4), #603000); box-shadow: 0 0 6px var(--accent4); }
+
+  .chrom-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.5rem;
+    color: rgba(255,255,255,0.5);
+    position: absolute;
+    bottom: -14px;
+    white-space: nowrap;
+  }
+
+  /* STAT BARS */
+  .stat-bar-wrap { margin-bottom: 8px; }
+  .stat-bar-label {
+    display: flex; justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .stat-bar {
+    height: 5px;
+    background: #0a1830;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity: 0.4; } }
+  .pulse { animation: pulse 1.5s infinite; }
+
+  /* HUD overlay on canvas */
+  .canvas-hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(0,245,255,0.5);
+    pointer-events: none;
+  }
+
+  .canvas-hud-item { margin-bottom: 2px; }
+
+  .view-tabs {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  .view-tab {
+    flex: 1;
+    padding: 6px;
+    text-align: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    border: 1px solid #0d2040;
+    border-radius: 2px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .view-tab.active { border-color: var(--accent1); color: var(--accent1); background: #001830; }
+
+  .separator {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #0d2040, transparent);
+    margin: 14px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ Simulimi 3D i ADN &amp; Mutacionit Gjenetik</h1>
+  <p>// DNA · KROMOZO M · QELIZA · SËMUNDJET GJENETIKE //</p>
+</header>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <div class="panel-title">⚙ Kontrollet e Mutacionit</div>
+
+    <div class="view-tabs">
+      <div class="view-tab active" data-view="dna" onclick="setView('dna')">ADN</div>
+      <div class="view-tab" data-view="cell" onclick="setView('cell')">QELIZA</div>
+      <div class="view-tab" data-view="karyo" onclick="setView('karyo')">KARIOTIPI</div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">— Ndryshimet Kromozomike</span>
+      <div class="btn-grid">
+        <button class="btn danger" onclick="triggerMutation('trisomy21')">+21 (Down)</button>
+        <button class="btn danger" onclick="triggerMutation('trisomy18')">+18 (Edwards)</button>
+        <button class="btn danger" onclick="triggerMutation('trisomy13')">+13 (Patau)</button>
+        <button class="btn danger" onclick="triggerMutation('monosomyX')">−X (Turner)</button>
+        <button class="btn danger" onclick="triggerMutation('XXY')">XXY (Klinefelter)</button>
+        <button class="btn danger" onclick="triggerMutation('deletion5p')">del5p (Cri-du-chat)</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">— Mutacionet e ADN-së</span>
+      <div class="btn-grid">
+        <button class="btn warn" onclick="triggerMutation('substitution')">Zëvendësim</button>
+        <button class="btn warn" onclick="triggerMutation('deletion')">Fshirje bazë</button>
+        <button class="btn warn" onclick="triggerMutation('insertion')">Shtim bazë</button>
+        <button class="btn warn" onclick="triggerMutation('frameshift')">Frameshift</button>
+        <button class="btn warn" onclick="triggerMutation('inversion')">Inverzion</button>
+        <button class="btn warn" onclick="triggerMutation('translocation')">Translokacion</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">— Faktorët e Jashtëm</span>
+      <div class="btn-grid-3">
+        <button class="btn warn" onclick="triggerExternal('radiation')">☢ Rrezatim</button>
+        <button class="btn warn" onclick="triggerExternal('chemical')">⚗ Kimikate</button>
+        <button class="btn warn" onclick="triggerExternal('virus')">🦠 Virus</button>
+        <button class="btn warn" onclick="triggerExternal('uv')">☀ UV</button>
+        <button class="btn warn" onclick="triggerExternal('reactive')">⚡ ROX</button>
+        <button class="btn warn" onclick="triggerExternal('temperature')">🌡 Temp</button>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <span class="control-label">— Parametrat</span>
+      <div class="slider-wrap">
+        <label style="font-size:0.72rem; color:var(--muted);">Shpejtësia e ADN</label>
+        <input type="range" min="0.1" max="3" step="0.1" value="1" oninput="setSpeed(this.value)" />
+        <div class="slider-val" id="speedVal">1.0x</div>
+      </div>
+      <div class="slider-wrap" style="margin-top:10px;">
+        <label style="font-size:0.72rem; color:var(--muted);">Intensiteti Mutacionit</label>
+        <input type="range" min="0" max="100" value="50" oninput="setMutIntensity(this.value)" />
+        <div class="slider-val" id="mutVal">50%</div>
+      </div>
+    </div>
+
+    <button class="btn safe" style="width:100%; margin-top:4px;" onclick="resetSim()">↺ RIVENDOS</button>
+  </div>
+
+  <!-- CENTER: CANVAS -->
+  <div class="panel canvas-panel">
+    <canvas id="simCanvas"></canvas>
+    <div class="canvas-hud" id="hud">
+      <div class="canvas-hud-item" id="hud-view">VIEW: ADN 3D</div>
+      <div class="canvas-hud-item" id="hud-state">GJENDJE: NORMALE</div>
+      <div class="canvas-hud-item" id="hud-time">t = 0.00s</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel" style="display:flex; flex-direction:column; gap:0;">
+    <div class="panel-title">📊 Analiza & Sëmundjet</div>
+
+    <!-- Karyotype strip -->
+    <div class="control-group">
+      <span class="control-label">— Kariotipi</span>
+      <div class="karyotype-strip" id="karyoStrip"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-bar-wrap">
+      <div class="stat-bar-label"><span>Stabiliteti i ADN-së</span><span id="s-stability">100%</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-stability" style="width:100%; background: linear-gradient(90deg, #00f5ff, #00a0ff);"></div></div>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar-label"><span>Dëmtimi Kromozomik</span><span id="s-damage">0%</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-damage" style="width:0%; background: linear-gradient(90deg, #ff2d6e, #ff0040);"></div></div>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar-label"><span>Riparimi (DNA Repair)</span><span id="s-repair">85%</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-repair" style="width:85%; background: linear-gradient(90deg, #7fff00, #40c000);"></div></div>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar-label"><span>Rreziku i Kancerit</span><span id="s-cancer">0%</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-cancer" style="width:0%; background: linear-gradient(90deg, #ff9500, #ff6000);"></div></div>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Disease card -->
+    <div id="diseaseArea">
+      <div class="info-box safe">
+        <div class="info-box-title">Gjendja Aktuale</div>
+        <div class="info-box-val">✅ ADN normale. Nuk ka mutacion të zbuluar.</div>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Log -->
+    <span class="control-label">— Regjistri i Ngjarjeve</span>
+    <div class="log-area" id="logArea">
+      <div class="log-entry">[SISTEM] Simulimi u nis...</div>
+      <div class="log-info">[INFO] ADN e shëndetshme. 46 kromozome normale.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===================================================
+//  3D DNA & CELL MUTATION SIMULATOR
+// ===================================================
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+// STATE
+let state = {
+  view: 'dna',
+  time: 0,
+  speed: 1,
+  mutIntensity: 0.5,
+  mutation: null,
+  external: null,
+  stability: 100,
+  damage: 0,
+  repairCapacity: 85,
+  cancerRisk: 0,
+  chromCount: 46,
+  extraChroms: [],
+  deletedChroms: [],
+  mutatedChroms: [],
+  particles: [],
+  flashAlpha: 0,
+  flashColor: '#ff2d6e',
+  dnaOffset: 0,
+  cellPulse: 0,
+};
+
+// DISEASE DATABASE
+const diseases = {
+  trisomy21: {
+    name: "Sindromi i Down (Trisomia 21)",
+    desc: "Prania e një kopje shtesë të kromozomit 21. Shkakton vonesë zhvillimore, karakteristika të veçanta fizike dhe probleme shëndetësore.",
+    type: "Anomali Kromozomike",
+    severity: "danger",
+    prevalence: "1/700 lindje",
+    symptoms: ["Vonesa mendore e moderuar","Tipare fizike karakteristike","Defekte kardiake","Rrezik i rritur i leukemisë"],
+    badges: ["Aneuploidia", "Trisomia", "Autosom"],
+    chrom: 21, extra: true
+  },
+  trisomy18: {
+    name: "Sindromi i Edwards (Trisomia 18)",
+    desc: "Prania e tre kopjeve të kromozomit 18. Gjendje shumë e rëndë, shumica e fetuseve nuk mbijetojnë.",
+    type: "Anomali Kromozomike",
+    severity: "danger",
+    prevalence: "1/5000 lindje",
+    symptoms: ["Defekte të rënda organike","Peshë e ulët lindjeje","Grusht i mbyllur karakteristik","Vdekshmëri e lartë infantile"],
+    badges: ["Aneuploidia", "Trisomia", "Letale"],
+    chrom: 18, extra: true
+  },
+  trisomy13: {
+    name: "Sindromi i Patau (Trisomia 13)",
+    desc: "Tre kopje të kromozomit 13. Shumë e rëndë, me defekte të shumta të lindura.",
+    type: "Anomali Kromozomike",
+    severity: "danger",
+    prevalence: "1/10000 lindje",
+    symptoms: ["Defekte kardiake","Mikrocefalit","Polydaktilia","Vdekshmëri shumë e lartë"],
+    badges: ["Aneuploidia", "Trisomia", "Letale"],
+    chrom: 13, extra: true
+  },
+  monosomyX: {
+    name: "Sindromi i Turner (45,X)",
+    desc: "Femra me vetëm një kromozom X. Shkakton çrregullime zhvillimore dhe infertilitet.",
+    type: "Anomali e Kromozomit Seksual",
+    severity: "danger",
+    prevalence: "1/2500 femra",
+    symptoms: ["Shtat i shkurtër","Infertilitet","Probleme kardiake (aorta)","Amenorea primare"],
+    badges: ["Monosomia", "Gonosom", "Femëror"],
+    chrom: 'X', deleted: true
+  },
+  XXY: {
+    name: "Sindromi i Klinefelter (47,XXY)",
+    desc: "Mashkull me dy kromozome X dhe një Y. Ndikon në fertilitet dhe zhvillim hormonal.",
+    type: "Anomali e Kromozomit Seksual",
+    severity: "warn",
+    prevalence: "1/1000 meshkuj",
+    symptoms: ["Infertilitet","Testikule të vogla","Gjinekoblastia","Vonesë gjuhësore"],
+    badges: ["Aneuploidia", "Gonosom", "Mashkullor"],
+    chrom: 'X', extra: true
+  },
+  deletion5p: {
+    name: "Sindromi Cri-du-chat (del5p)",
+    desc: "Fshirje e krahut të shkurtër të kromozomit 5. Plangit si macja tek të sapolindurit.",
+    type: "Delecioni Kromozomik",
+    severity: "danger",
+    prevalence: "1/50000",
+    symptoms: ["Plangit karakteristik (mace)","Mikrocefalit","Vonesë mendore","Hipotoni"],
+    badges: ["Delecioni", "Autosom", "5p-"],
+    chrom: 5, deleted: true
+  },
+  substitution: {
+    name: "Mutacion Pikësor — Zëvendësim Bazash",
+    desc: "Një bazë azotike zëvendësohet me tjetrën. Mund të jetë sinonime (pa efekt) ose missense (ndryshim aminoacidi).",
+    type: "Mutacion Pikësor",
+    severity: "warn",
+    examples: "Anemia sëpate (HbS): A→T në kodonin 6 të HBB",
+    symptoms: ["Ndrysho aminoacid ose jo","Mund të ndikojë funksionin proteinik","Sëmundja e drapanocitozës","Fenilketonuria (PKU)"],
+    badges: ["SNP", "Misense", "Nonsense"],
+  },
+  deletion: {
+    name: "Fshirje e Bazës (Deletion)",
+    desc: "Humbja e një ose më shumë bazave azotike nga sekuenca e ADN-së.",
+    type: "Mutacion Struktural",
+    severity: "danger",
+    symptoms: ["Frameshift (nëse jo multiple 3)","Proteina jo-funksionale","Fibrozë cistike (CFTR)","Distrofia muskulare Duchenne"],
+    badges: ["Deletion", "Frameshift", "LOF"],
+  },
+  insertion: {
+    name: "Shtim i Bazës (Insertion)",
+    desc: "Shtimi i bazave të reja në sekuencën e ADN-së, duke prishur kornizën e leximit.",
+    type: "Mutacion Struktural",
+    severity: "warn",
+    symptoms: ["Frameshift mutation","Proteina të ndryshuara ose joaktive","Huntington (CAG repeat)","Sindroma X e brishtë"],
+    badges: ["Insertion", "Frameshift", "Repeat"],
+  },
+  frameshift: {
+    name: "Mutacion Frameshift",
+    desc: "Ndryshim i kornizës së leximit — të gjitha aminoacidet pas mutacionit ndryshohen.",
+    type: "Mutacion Struktural",
+    severity: "danger",
+    symptoms: ["Proteina shumë e ndryshuar","Shpesh jo-funksionale","Ndam premature stop codon","Kancer kolorektal (HNPCC)"],
+    badges: ["Frameshift", "Deleterious", "LOF"],
+  },
+  inversion: {
+    name: "Inverzion Kromozomik",
+    desc: "Një segment i kromozomit kthehet 180°. Zakonisht nuk humb material gjenetik, por mund të prishë genet.",
+    type: "Ristrukturim Kromozomik",
+    severity: "warn",
+    symptoms: ["Mund të jetë asimptomatik","Infertilitet i mundshëm","Çrregullime të meiozes","Parakla malignante"],
+    badges: ["Inverzion", "Paracentric", "Pericentric"],
+  },
+  translocation: {
+    name: "Translokacion Kromozomik",
+    desc: "Segmente të dy kromozomeve të ndryshme shkëmbehen mes tyre. Mund të shkaktojë kancer.",
+    type: "Ristrukturim Kromozomik",
+    severity: "danger",
+    symptoms: ["Leucemia (t(9;22) - Philadelphia)","Linfoma Burkitt (t(8;14))","Infertilitet","Abort spontan i përsëritur"],
+    badges: ["Translokacion", "Reciproke", "Philadelphia"],
+  },
+};
+
+const externalEffects = {
+  radiation: { name: "Rrezatimi Jonizues", color: '#ffff00', desc: "Shkakton thyerje të vargjeve të ADN-së dhe dëmtime okzidative të bazave.", disease: "Rreziku i rritur i kancerit (leucemia, karcinoma)", mutations: ['deletion','frameshift','translocation'] },
+  chemical: { name: "Mutagjenë Kimikë", color: '#ff6600', desc: "Alkilantët, agjentët ndërlidhës — modifikojnë bazat azotike.", disease: "Kanceri i mushkërive, mezothelioma (asbest), kanceri i fshikëzës", mutations: ['substitution','insertion'] },
+  virus: { name: "Virus Onkogjenikë", color: '#cc00ff', desc: "HPV, EBV, HTLV — integrojnë ADN-në e tyre në gjenomë.", disease: "Kanceri cervikal (HPV), limfoma Burkitt (EBV), leucemia (HTLV)", mutations: ['insertion','translocation'] },
+  uv: { name: "Rrezatimi UV", color: '#ff99ff', desc: "UV-B shkakton dimer të timinës — thyerje lokale të strukturës.", disease: "Melanoma, karcinoma skvamose e lëkurës, xeroderma pigmentosum", mutations: ['substitution','deletion'] },
+  reactive: { name: "Oksigjeni Reaktiv (ROS)", color: '#ff4400', desc: "8-oxoguanina — mutacion G→T shumë i zakonshëm nga stresi oksidativ.", disease: "Plakja qelizore, Parkinson, kancere të ndryshme", mutations: ['substitution'] },
+  temperature: { name: "Temperatura e Lartë / Goditje Termike", color: '#ff2200', desc: "Denaturimi i proteinave të riparimit, mospunë e polimerazave.", disease: "Dëmtim i proteinave, nekrozë qelizore, mundësi mutacioni", mutations: ['substitution','deletion'] },
+};
+
+// ============ CANVAS SETUP ============
+function resizeCanvas() {
+  const p = canvas.parentElement;
+  canvas.width = p.clientWidth - 16;
+  canvas.height = p.clientHeight - 16;
+}
+window.addEventListener('resize', () => { resizeCanvas(); });
+resizeCanvas();
+
+// ============ LOG ============
+function log(msg, type='entry') {
+  const la = document.getElementById('logArea');
+  const d = document.createElement('div');
+  d.className = `log-${type}`;
+  const now = state.time.toFixed(1);
+  d.textContent = `[${now}s] ${msg}`;
+  la.appendChild(d);
+  la.scrollTop = la.scrollHeight;
+}
+
+// ============ MUTATIONS ============
+function triggerMutation(type) {
+  state.mutation = type;
+  const d = diseases[type];
+  if (!d) return;
+
+  state.damage = Math.min(100, state.damage + 20 + Math.random()*30*state.mutIntensity);
+  state.stability = Math.max(0, 100 - state.damage);
+  state.cancerRisk = Math.min(100, state.cancerRisk + 8*state.mutIntensity);
+  state.repairCapacity = Math.max(0, state.repairCapacity - 5);
+
+  // Karyo changes
+  if (d.extra) {
+    const n = d.chrom;
+    if (!state.extraChroms.includes(n)) state.extraChroms.push(n);
+  }
+  if (d.deleted) {
+    const n = d.chrom;
+    if (!state.deletedChroms.includes(n)) state.deletedChroms.push(n);
+  }
+
+  state.flashAlpha = 1;
+  state.flashColor = d.severity === 'danger' ? '#ff2d6e' : '#ff9500';
+
+  updateDiseaseDisplay(d);
+  updateKaryotype();
+  updateStats();
+  log(`MUTACION: ${d.name}`, d.severity === 'danger' ? 'danger' : 'warn');
+  spawnParticles(20, state.flashColor);
+}
+
+function triggerExternal(type) {
+  const e = externalEffects[type];
+  if (!e) return;
+  state.external = type;
+  state.damage = Math.min(100, state.damage + 15*state.mutIntensity);
+  state.stability = Math.max(0, 100 - state.damage);
+  state.cancerRisk = Math.min(100, state.cancerRisk + 12*state.mutIntensity);
+
+  state.flashAlpha = 1;
+  state.flashColor = e.color;
+
+  const extDisease = {
+    name: e.name + " → Dëmtim ADN",
+    desc: e.desc + "\n\n🔬 Sëmundjet e mundshme: " + e.disease,
+    type: "Faktor i Jashtëm Mutagjenik",
+    severity: "warn",
+    symptoms: [e.disease],
+    badges: ["Mutagjen", "I Jashtëm", "Epigjetik"],
+  };
+  updateDiseaseDisplay(extDisease);
+  updateStats();
+  log(`FAKTOR JASHTËM: ${e.name}`, 'warn');
+  spawnParticles(30, e.color);
+
+  // trigger a random mutation too
+  const m = e.mutations[Math.floor(Math.random()*e.mutations.length)];
+  setTimeout(() => triggerMutation(m), 600);
+}
+
+function updateDiseaseDisplay(d) {
+  const area = document.getElementById('diseaseArea');
+  const sevClass = d.severity || 'warn';
+  const badgesHtml = (d.badges||[]).map(b => `<span class="badge badge-${sevClass === 'danger' ? 'danger' : sevClass === 'warn' ? 'warn' : 'info'}">${b}</span>`).join('');
+  const sympHtml = (d.symptoms||[]).map(s => `• ${s}`).join('<br>');
+  area.innerHTML = `
+    <div class="disease-card">
+      <div class="disease-name">⚠ ${d.name}</div>
+      <div class="disease-meta" style="margin-bottom:6px;">${d.type}</div>
+      <div class="disease-desc">${d.desc}</div>
+      ${badgesHtml ? `<div style="margin-bottom:6px;">${badgesHtml}</div>` : ''}
+      <div class="disease-desc" style="font-size:0.76rem;">${sympHtml}</div>
+      ${d.prevalence ? `<div class="disease-meta">Prevalenca: ${d.prevalence}</div>` : ''}
+    </div>`;
+}
+
+function updateStats() {
+  const setBar = (id, val, barId) => {
+    document.getElementById(id).textContent = Math.round(val) + '%';
+    document.getElementById(barId).style.width = val + '%';
+  };
+  setBar('s-stability', state.stability, 'bar-stability');
+  setBar('s-damage', state.damage, 'bar-damage');
+  setBar('s-repair', state.repairCapacity, 'bar-repair');
+  setBar('s-cancer', state.cancerRisk, 'bar-cancer');
+  document.getElementById('hud-state').textContent =
+    state.damage > 70 ? 'GJENDJE: KRITIKE ⚠' :
+    state.damage > 30 ? 'GJENDJE: MUTACION ⚡' : 'GJENDJE: NORMALE';
+}
+
+// ============ KARYOTYPE ============
+function buildKaryo() {
+  const strip = document.getElementById('karyoStrip');
+  strip.innerHTML = '';
+  // 22 pairs + XY
+  for (let i = 1; i <= 22; i++) {
+    for (let j = 0; j < 2; j++) {
+      const c = document.createElement('div');
+      const h = 12 + (22 - i) * 0.8;
+      c.className = 'chrom';
+      c.style.height = h + 'px';
+      c.style.width = '10px';
+      if (state.deletedChroms.includes(i) && j===0) c.classList.add('deleted');
+      else if (state.extraChroms.includes(i) && j===1) c.classList.add('extra');
+      else if (state.mutatedChroms.includes(i)) c.classList.add('mutated');
+      if (j===0) {
+        const lbl = document.createElement('span');
+        lbl.className = 'chrom-label';
+        lbl.textContent = i;
+        c.appendChild(lbl);
+      }
+      strip.appendChild(c);
+    }
+    // add extra for trisomies
+    if (state.extraChroms.includes(i)) {
+      const ce = document.createElement('div');
+      const h = 12 + (22-i)*0.8;
+      ce.className = 'chrom extra';
+      ce.style.height = h+'px'; ce.style.width='10px';
+      strip.appendChild(ce);
+    }
+  }
+  // sex chroms
+  const sx = ['X','X','Y'];
+  sx.forEach((s,i) => {
+    const c = document.createElement('div');
+    c.className = 'chrom';
+    c.style.height = '18px'; c.style.width = '10px';
+    if (s === 'Y') c.style.background = 'linear-gradient(180deg,#6060ff,#000090)';
+    if (state.deletedChroms.includes('X') && i===1) c.classList.add('deleted');
+    if (state.extraChroms.includes('X') && i===1) c.classList.add('extra');
+    strip.appendChild(c);
+  });
+}
+function updateKaryotype() { buildKaryo(); }
+buildKaryo();
+
+// ============ PARTICLES ============
+function spawnParticles(n, color) {
+  const cx = canvas.width/2, cy = canvas.height/2;
+  for (let i=0;i<n;i++) {
+    state.particles.push({
+      x: cx + (Math.random()-0.5)*200,
+      y: cy + (Math.random()-0.5)*200,
+      vx: (Math.random()-0.5)*4,
+      vy: (Math.random()-0.5)*4,
+      life: 1, decay: 0.015+Math.random()*0.02,
+      color, size: 2+Math.random()*3
+    });
+  }
+}
+
+// ============ DRAW FUNCTIONS ============
+function drawDNA() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // background
+  ctx.fillStyle = '#020812';
+  ctx.fillRect(0,0,W,H);
+
+  const cx = W/2;
+  const amplitude = Math.min(W*0.18, 80);
+  const totalBases = 28;
+  const spacing = H / (totalBases+2);
+
+  state.dnaOffset += 0.025 * state.speed;
+
+  // Draw double helix
+  for (let i=0; i<totalBases; i++) {
+    const y = spacing + i * spacing;
+    const t = i / totalBases * Math.PI * 4 + state.dnaOffset;
+    const x1 = cx + Math.sin(t) * amplitude;
+    const x2 = cx + Math.sin(t + Math.PI) * amplitude;
+    const depth = (Math.sin(t)+1)/2;
+
+    // Determine base pair colors
+    let col1 = `rgba(0,${Math.round(180+depth*75)},${Math.round(200+depth*55)},${0.6+depth*0.4})`;
+    let col2 = `rgba(${Math.round(200+depth*55)},0,${Math.round(80+depth*80)},${0.6+depth*0.4})`;
+    let isMutated = false;
+
+    if (state.mutation) {
+      // highlight some bases as mutated
+      if (state.mutation === 'substitution' && (i===8||i===12||i===18)) { col1='#ffff00'; col2='#ff4400'; isMutated=true; }
+      if (state.mutation === 'deletion' && (i===10||i===11)) { col1='rgba(255,0,80,0.15)'; col2='rgba(255,0,80,0.15)'; }
+      if (state.mutation === 'insertion' && i===13) { col1='#ff9500'; col2='#ffcc00'; isMutated=true; }
+      if (state.mutation === 'frameshift' && i>12) { col1=`rgba(255,${Math.round(80+i*3)},0,0.7)`; col2='rgba(255,100,0,0.5)'; }
+      if (state.mutation === 'inversion' && i>=8 && i<=16) { col1='#aa00ff'; col2='#7700cc'; isMutated=true; }
+    }
+
+    // Left backbone
+    if (i > 0) {
+      const pt = (i-1)/totalBases*Math.PI*4 + state.dnaOffset;
+      const px1 = cx + Math.sin(pt)*amplitude;
+      const px2 = cx + Math.sin(pt+Math.PI)*amplitude;
+      ctx.beginPath(); ctx.moveTo(px1, y-spacing); ctx.lineTo(x1, y);
+      ctx.strokeStyle = col1; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px2, y-spacing); ctx.lineTo(x2, y);
+      ctx.strokeStyle = col2; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+
+    // Base pair rungs
+    const alpha = 0.4 + depth*0.4;
+    const grad = ctx.createLinearGradient(x1,y,x2,y);
+    grad.addColorStop(0, col1);
+    grad.addColorStop(0.5, `rgba(255,255,255,${alpha*0.2})`);
+    grad.addColorStop(1, col2);
+    ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y);
+    ctx.strokeStyle = grad; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Nucleotide balls
+    const r = isMutated ? 5 : 3.5;
+    [x1,x2].forEach((bx,bi) => {
+      ctx.beginPath(); ctx.arc(bx,y,r,0,Math.PI*2);
+      ctx.fillStyle = bi===0 ? col1 : col2;
+      ctx.fill();
+      if (isMutated) {
+        ctx.beginPath(); ctx.arc(bx,y,r+3,0,Math.PI*2);
+        ctx.strokeStyle = bi===0 ? col1 : col2;
+        ctx.lineWidth = 1; ctx.globalAlpha = 0.4; ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    });
+
+    // Base labels for middle section
+    if (depth > 0.7 && i%2===0) {
+      const bases = ['A','T','G','C','A','G','T','C','G','A','T','G','C','A'];
+      const base = bases[i%bases.length];
+      const comp = {A:'T',T:'A',G:'C',C:'G'}[base];
+      ctx.font = '9px Share Tech Mono, monospace';
+      ctx.fillStyle = `rgba(255,255,255,${depth*0.7})`;
+      ctx.textAlign = 'center';
+      ctx.fillText(base, x1, y+3);
+      ctx.fillText(comp, x2, y+3);
+    }
+  }
+
+  // External factor visual effects
+  if (state.external) {
+    const e = externalEffects[state.external];
+    for (let i=0;i<5;i++) {
+      const ry = Math.random()*H;
+      const rx = (Math.random()-0.5)*W;
+      ctx.beginPath();
+      ctx.moveTo(cx+rx, 0);
+      ctx.lineTo(cx+rx+(Math.random()-0.5)*40, ry);
+      ctx.strokeStyle = e.color + '44';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  drawParticles();
+  drawFlash();
+}
+
+function drawCell() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#020812';
+  ctx.fillRect(0,0,W,H);
+
+  const cx = W/2, cy = H/2;
+  state.cellPulse += 0.03 * state.speed;
+
+  const cellR = Math.min(W,H)*0.35 + Math.sin(state.cellPulse)*4;
+
+  // Cell membrane gradient
+  const memGrad = ctx.createRadialGradient(cx,cy,cellR*0.7,cx,cy,cellR);
+  memGrad.addColorStop(0, 'rgba(0,60,100,0)');
+  memGrad.addColorStop(0.7, 'rgba(0,80,150,0.08)');
+  memGrad.addColorStop(0.9, 'rgba(0,150,200,0.25)');
+  memGrad.addColorStop(1, 'rgba(0,200,255,0.6)');
+
+  ctx.beginPath(); ctx.arc(cx,cy,cellR,0,Math.PI*2);
+  ctx.fillStyle = memGrad; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,245,255,0.6)'; ctx.lineWidth = 2; ctx.stroke();
+
+  // Cytoplasm organelles
+  const orgPositions = [
+    {x:cx-cellR*0.35, y:cy-cellR*0.2, r:14, col:'rgba(0,180,100,0.5)', label:'Mitokondri'},
+    {x:cx+cellR*0.3, y:cy-cellR*0.3, r:10, col:'rgba(0,100,200,0.4)', label:'Ribozom'},
+    {x:cx-cellR*0.2, y:cy+cellR*0.35, r:12, col:'rgba(150,50,200,0.4)', label:'Vakuolë'},
+    {x:cx+cellR*0.35, y:cy+cellR*0.2, r:9, col:'rgba(200,100,0,0.4)', label:'Lizozom'},
+  ];
+
+  orgPositions.forEach(o => {
+    ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
+    ctx.fillStyle = o.col; ctx.fill();
+    ctx.font = '9px Rajdhani, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign='center';
+    ctx.fillText(o.label, o.x, o.y+o.r+12);
+  });
+
+  // Nucleus
+  const nucR = cellR*0.3;
+  const nucGrad = ctx.createRadialGradient(cx,cy,0,cx,cy,nucR);
+  nucGrad.addColorStop(0, 'rgba(0,40,120,0.9)');
+  nucGrad.addColorStop(0.6, 'rgba(0,20,80,0.8)');
+  nucGrad.addColorStop(1, 'rgba(0,100,200,0.5)');
+  ctx.beginPath(); ctx.arc(cx,cy,nucR,0,Math.PI*2);
+  ctx.fillStyle = nucGrad; ctx.fill();
+  ctx.strokeStyle = state.damage>30 ? `rgba(255,${Math.round(100-state.damage)},0,0.8)` : 'rgba(0,200,255,0.8)';
+  ctx.lineWidth = 2; ctx.stroke();
+
+  // Chromatin inside nucleus
+  const numStrands = state.damage > 50 ? 4 : 8;
+  for (let i=0;i<numStrands;i++) {
+    const a = (i/numStrands)*Math.PI*2 + state.cellPulse*0.3;
+    const sx = cx + Math.cos(a)*nucR*0.6;
+    const sy = cy + Math.sin(a)*nucR*0.6;
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    for (let j=1;j<=5;j++) {
+      const ba = a + j*0.3 + Math.sin(state.cellPulse+j)*0.1;
+      const br = nucR*(0.3+j*0.06);
+      ctx.lineTo(cx+Math.cos(ba)*br, cy+Math.sin(ba)*br);
+    }
+    const damaged = state.damage > 40 && i < 2;
+    ctx.strokeStyle = damaged ? 'rgba(255,80,0,0.7)' : 'rgba(0,200,255,0.5)';
+    ctx.lineWidth = damaged ? 3 : 1.5; ctx.stroke();
+  }
+
+  // Nucleus label
+  ctx.font = 'bold 11px Rajdhani, sans-serif';
+  ctx.fillStyle = 'rgba(0,245,255,0.7)';
+  ctx.textAlign = 'center';
+  ctx.fillText('BËRTHAMA', cx, cy+4);
+
+  // Mutation visual overlay
+  if (state.damage > 30) {
+    for (let i=0;i<3;i++) {
+      const a = (i/3)*Math.PI*2 + state.cellPulse*0.5;
+      const r = nucR*(0.5+Math.random()*0.5);
+      ctx.beginPath();
+      ctx.arc(cx+Math.cos(a)*r, cy+Math.sin(a)*r, 4+Math.sin(state.cellPulse+i)*2, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,${Math.round(50+state.damage)},0,0.7)`;
+      ctx.fill();
+    }
+  }
+
+  drawParticles();
+  drawFlash();
+
+  // Label
+  ctx.font = '10px Share Tech Mono, monospace';
+  ctx.fillStyle = 'rgba(0,245,255,0.3)';
+  ctx.textAlign = 'center';
+  ctx.fillText('QELIZA EUKARIOTIKE — BËRTHAMA DHE ORGANELAT', cx, H-15);
+}
+
+function drawKaryoView() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#020812';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.font = 'bold 11px Orbitron, monospace';
+  ctx.fillStyle = 'rgba(0,245,255,0.6)';
+  ctx.textAlign = 'center';
+  ctx.fillText('KARYOGRAM — 46 KROMOSOME NJERËZORE', W/2, 25);
+
+  const pairs = 23;
+  const chromW = Math.min((W-60)/(pairs*2+2), 18);
+  const startX = (W - (pairs*2 + pairs-1)*chromW - (pairs-1)*4) / 2;
+  const baseY = H*0.2;
+  const maxH = H*0.55;
+
+  for (let p=0; p<pairs; p++) {
+    const chromNum = p+1;
+    const h = maxH * (1 - p/pairs*0.55);
+    const gx = startX + p * (chromW*2 + 4 + chromW*0.5);
+
+    for (let c=0; c<2; c++) {
+      const x = gx + c*(chromW+2);
+      const isDeleted = state.deletedChroms.includes(chromNum) && c===0;
+      const isExtra = state.extraChroms.includes(chromNum);
+      const isMutated = state.mutatedChroms.includes(chromNum) ||
+        (state.mutation && ['substitution','deletion','insertion','frameshift'].includes(state.mutation) && chromNum===17);
+
+      let grad;
+      if (isDeleted) {
+        ctx.globalAlpha = 0.15;
+        grad = ctx.createLinearGradient(x, baseY, x, baseY+h);
+        grad.addColorStop(0,'#222'); grad.addColorStop(1,'#111');
+      } else if (isMutated) {
+        grad = ctx.createLinearGradient(x,baseY,x,baseY+h);
+        grad.addColorStop(0,'#ff9500'); grad.addColorStop(0.5,'#ff6600'); grad.addColorStop(1,'#cc4400');
+      } else {
+        grad = ctx.createLinearGradient(x,baseY,x,baseY+h);
+        grad.addColorStop(0,'#00f5ff'); grad.addColorStop(0.4,'#0080ff'); grad.addColorStop(1,'#0030a0');
+      }
+
+      // Draw chromosome (rounded rect)
+      const cw = chromW-1;
+      ctx.beginPath();
+      const r = cw/2;
+      ctx.moveTo(x+r, baseY);
+      ctx.lineTo(x+cw-r, baseY);
+      ctx.arcTo(x+cw,baseY, x+cw,baseY+r, r);
+      ctx.lineTo(x+cw, baseY+h-r);
+      ctx.arcTo(x+cw, baseY+h, x+cw-r, baseY+h, r);
+      ctx.lineTo(x+r, baseY+h);
+      ctx.arcTo(x, baseY+h, x, baseY+h-r, r);
+      ctx.lineTo(x, baseY+r);
+      ctx.arcTo(x, baseY, x+r, baseY, r);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Centromere
+      const cenY = baseY + h*0.45;
+      ctx.beginPath();
+      ctx.moveTo(x, cenY); ctx.lineTo(x+cw, cenY);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Bands (simplified)
+      for (let b=1;b<4;b++) {
+        const by = baseY + h*(b/4.5);
+        if (Math.abs(by-cenY)>4) {
+          ctx.beginPath(); ctx.moveTo(x+1,by); ctx.lineTo(x+cw-1,by);
+          ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=2; ctx.stroke();
+        }
+      }
+
+      if (isExtra) {
+        ctx.strokeStyle='#ff2d6e'; ctx.lineWidth=1.5;
+        ctx.beginPath();
+        const xb=x-1, xw=cw+2;
+        ctx.strokeRect(xb,baseY-1,xw,h+2);
+      }
+    }
+
+    // Extra chrom for trisomy
+    if (state.extraChroms.includes(chromNum)) {
+      const ex = gx + 2*(chromW+2);
+      const eh = h;
+      const grad2 = ctx.createLinearGradient(ex,baseY,ex,baseY+eh);
+      grad2.addColorStop(0,'#ff2d6e'); grad2.addColorStop(1,'#800020');
+      const cw = chromW-1;
+      ctx.beginPath();
+      const r=cw/2;
+      ctx.moveTo(ex+r,baseY); ctx.lineTo(ex+cw-r,baseY);
+      ctx.arcTo(ex+cw,baseY,ex+cw,baseY+r,r);
+      ctx.lineTo(ex+cw,baseY+eh-r);
+      ctx.arcTo(ex+cw,baseY+eh,ex+cw-r,baseY+eh,r);
+      ctx.lineTo(ex+r,baseY+eh);
+      ctx.arcTo(ex,baseY+eh,ex,baseY+eh-r,r);
+      ctx.lineTo(ex,baseY+r);
+      ctx.arcTo(ex,baseY,ex+r,baseY,r);
+      ctx.fillStyle=grad2; ctx.fill();
+      ctx.shadowColor='#ff2d6e'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(ex+cw/2, baseY-8, 5, 0, Math.PI*2);
+      ctx.fillStyle='#ff2d6e'; ctx.fill();
+      ctx.shadowBlur=0;
+    }
+
+    // Label
+    ctx.font = `${Math.round(chromW*0.7)+4}px Share Tech Mono, monospace`;
+    ctx.fillStyle = 'rgba(0,245,255,0.5)';
+    ctx.textAlign = 'center';
+    if (p < 22) ctx.fillText(chromNum, gx + chromW, baseY+h+14);
+    else ctx.fillText('XY', gx+chromW, baseY+h+14);
+  }
+
+  drawParticles();
+  drawFlash();
+}
+
+function drawParticles() {
+  state.particles = state.particles.filter(p => p.life > 0);
+  state.particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= p.decay;
+    p.vx *= 0.97; p.vy *= 0.97;
+  });
+}
+
+function drawFlash() {
+  if (state.flashAlpha > 0) {
+    ctx.fillStyle = state.flashColor;
+    ctx.globalAlpha = state.flashAlpha * 0.15;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.globalAlpha = 1;
+    state.flashAlpha -= 0.04;
+  }
+}
+
+// ============ HUD ============
+function updateHUD() {
+  document.getElementById('hud-time').textContent = `t = ${state.time.toFixed(1)}s`;
+  document.getElementById('hud-view').textContent =
+    state.view === 'dna' ? 'VIEW: ADN 3D' :
+    state.view === 'cell' ? 'VIEW: QELIZA' : 'VIEW: KARIOGRAM';
+}
+
+// ============ MAIN LOOP ============
+function loop() {
+  state.time += 0.016 * state.speed;
+  updateHUD();
+
+  if (state.view === 'dna') drawDNA();
+  else if (state.view === 'cell') drawCell();
+  else drawKaryoView();
+
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ============ UI FUNCTIONS ============
+function setView(v) {
+  state.view = v;
+  document.querySelectorAll('.view-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === v);
+  });
+}
+
+function setSpeed(v) {
+  state.speed = parseFloat(v);
+  document.getElementById('speedVal').textContent = parseFloat(v).toFixed(1) + 'x';
+}
+
+function setMutIntensity(v) {
+  state.mutIntensity = v/100;
+  document.getElementById('mutVal').textContent = v + '%';
+}
+
+function resetSim() {
+  state.mutation = null;
+  state.external = null;
+  state.stability = 100;
+  state.damage = 0;
+  state.repairCapacity = 85;
+  state.cancerRisk = 0;
+  state.extraChroms = [];
+  state.deletedChroms = [];
+  state.mutatedChroms = [];
+  state.particles = [];
+  state.flashAlpha = 0;
+  updateStats();
+  updateKaryotype();
+  document.getElementById('diseaseArea').innerHTML = `
+    <div class="info-box safe">
+      <div class="info-box-title">Gjendja Aktuale</div>
+      <div class="info-box-val">✅ ADN normale. Nuk ka mutacion të zbuluar.</div>
+    </div>`;
+  log('RIVENDOSUR: Simulimi u rivendos.', 'info');
+}
+</script>
+</body>
+</html>
